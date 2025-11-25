@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clean Reddit Scroller</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            background-color: #1e1e1e;
+            width: 100%;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        input {
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 60%;
+        }
+
+        button {
+            background: #ff4500;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #feed {
+            width: 100%;
+            max-width: 600px;
+            padding: 10px;
+        }
+
+        #feed.grid-view {
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .card {
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
+        }
+
+        #feed.grid-view .card {
+            margin-bottom: 0;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .card img, .card video {
+            width: 100%;
+            height: auto;
+            display: block;
+            max-height: 80vh; /* Don't let tall images take over entire screen */
+            object-fit: contain;
+            background: #000;
+        }
+
+        .card-content {
+            padding: 15px;
+        }
+
+        .title {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .btn-dl {
+            background-color: #333;
+            color: #4caf50;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-dl:hover {
+            background-color: #444;
+        }
+
+        .view-toggle {
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background-color 0.2s;
+        }
+
+        .view-toggle:hover {
+            background-color: #444;
+        }
+
+        .view-toggle.active {
+            background-color: #ff4500;
+            border-color: #ff4500;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+
+        /* Grid view specific styles */
+        #feed.grid-view .card img,
+        #feed.grid-view .card video {
+            max-height: 300px;
+            object-fit: cover;
+        }
+
+        #feed.grid-view .card-content {
+            padding: 10px;
+        }
+
+        #feed.grid-view .title {
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        #feed.grid-view .actions {
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <input type="text" id="subredditInput" placeholder="subreddit (e.g. pics)" value="pics">
+    <button onclick="loadFeed(true)">Go</button>
+    <button class="view-toggle" id="viewToggle" onclick="toggleView()" title="Toggle between list and grid view">
+        <span id="viewIcon">⊞</span>
+    </button>
+</header>
+
+<div id="feed">
+    </div>
+<div id="loading" class="loading" style="display:none;">Loading more...</div>
+
+<script>
+    let afterToken = '';
+    let currentSub = '';
+    let isLoading = false;
+    let isGridView = localStorage.getItem('viewMode') === 'grid';
+
+    // Initialize view mode
+    function initViewMode() {
+        const feed = document.getElementById('feed');
+        const viewIcon = document.getElementById('viewIcon');
+        const viewToggle = document.getElementById('viewToggle');
+        
+        if (isGridView) {
+            feed.classList.add('grid-view');
+            viewIcon.textContent = '☰';
+            viewToggle.classList.add('active');
+        } else {
+            feed.classList.remove('grid-view');
+            viewIcon.textContent = '⊞';
+            viewToggle.classList.remove('active');
+        }
+    }
+
+    // Toggle between list and grid view
+    function toggleView() {
+        isGridView = !isGridView;
+        localStorage.setItem('viewMode', isGridView ? 'grid' : 'list');
+        initViewMode();
+    }
+
+    // Load initial feed on Enter key
+    document.getElementById('subredditInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') loadFeed(true);
+    });
+
+    // Initialize view on page load
+    initViewMode();
+
+    async function loadFeed(reset = false) {
+        if (isLoading) return;
+        
+        // Check if running from file:// protocol
+        if (window.location.protocol === 'file:') {
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '<div style="text-align:center; padding:20px; color:#ff6b6b; line-height:1.6;">' +
+                '<strong>Error:</strong> This file must be run through a local web server, not opened directly.<br><br>' +
+                'Please run: <code style="background:#333; padding:5px; border-radius:3px;">./start.sh</code><br><br>' +
+                'Or: <code style="background:#333; padding:5px; border-radius:3px;">python3 -m http.server 8000</code><br><br>' +
+                'Then open: <code style="background:#333; padding:5px; border-radius:3px;">http://localhost:8000/reddit-downloader.html</code>' +
+                '</div>';
+            return;
+        }
+        
+        const subInput = document.getElementById('subredditInput').value.trim().replace('r/', '').replace(/^\/+|\/+$/g, '');
+        if (!subInput) {
+            alert('Please enter a subreddit name');
+            return;
+        }
+        
+        isLoading = true;
+        const feed = document.getElementById('feed');
+        const loadingDiv = document.getElementById('loading');
+        
+        if (reset) {
+            feed.innerHTML = '';
+            afterToken = '';
+            currentSub = subInput;
+        }
+
+        // Ensure we have a subreddit to fetch
+        if (!currentSub) {
+            currentSub = subInput;
+        }
+
+        loadingDiv.style.display = 'block';
+
+        try {
+            let response;
+            let json;
+            
+            // Try multiple approaches with different CORS proxies
+            const redditUrl = `https://www.reddit.com/r/${currentSub}/hot.json?limit=15&after=${afterToken}`;
+            const urls = [
+                // Try direct first (might work in some browsers)
+                `https://old.reddit.com/r/${currentSub}/hot.json?limit=15&after=${afterToken}`,
+                // Try different CORS proxies
+                `https://corsproxy.io/?${encodeURIComponent(redditUrl)}`,
+                `https://api.allorigins.win/get?url=${encodeURIComponent(redditUrl)}`,
+                `https://cors-anywhere.herokuapp.com/${redditUrl}`
+            ];
+            
+            let lastError = null;
+            let success = false;
+            
+            for (let i = 0; i < urls.length; i++) {
+                try {
+                    console.log(`Attempt ${i + 1}/${urls.length}: Trying to fetch...`);
+                    response = await fetch(urls[i], {
+                        method: 'GET',
+                        mode: 'cors',
+                        credentials: 'omit',
+                        headers: {
+                            'Accept': 'application/json',
+                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                        }
+                    });
+                    
+                    // Handle allorigins.win format (wraps in JSON)
+                    if (urls[i].includes('allorigins.win')) {
+                        const wrapper = await response.json();
+                        if (wrapper.contents) {
+                            json = JSON.parse(wrapper.contents);
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        // Check if response is OK
+                        if (response.ok) {
+                            const contentType = response.headers.get('content-type') || '';
+                            if (contentType.includes('application/json')) {
+                                json = await response.json();
+                            } else {
+                                const text = await response.text();
+                                if (text.includes('blocked') || text.includes('network security') || text.includes('403')) {
+                                    console.log(`Attempt ${i + 1} blocked by Reddit`);
+                                    lastError = new Error('Reddit is blocking requests');
+                                    continue;
+                                }
+                                // Try to parse as JSON anyway
+                                try {
+                                    json = JSON.parse(text);
+                                } catch {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            console.log(`Attempt ${i + 1} failed with status: ${response.status}`);
+                            if (response.status === 403 || response.status === 429) {
+                                lastError = new Error('Reddit is blocking requests (403/429)');
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    // Verify it's valid Reddit JSON
+                    if (json && json.data && json.data.children) {
+                        console.log(`✓ Success with attempt ${i + 1}`);
+                        success = true;
+                        break;
+                    } else {
+                        console.log(`Attempt ${i + 1} returned invalid JSON structure`);
+                    }
+                } catch (err) {
+                    console.log(`Attempt ${i + 1} error:`, err.message);
+                    lastError = err;
+                    // Continue to next attempt
+                }
+            }
+            
+            // If all attempts failed
+            if (!success || !json || !json.data) {
+                if (lastError && (lastError.message.includes('Failed to fetch') || lastError.message.includes('NetworkError'))) {
+                    throw new Error('Network error - check your internet connection and make sure you\'re running through a local server (not file://).');
+                }
+                throw lastError || new Error('Unable to fetch from Reddit. Reddit may be blocking requests. Try again in a few minutes.');
+            }
+            
+            // Check for Reddit API errors
+            if (json.error) {
+                throw new Error(`Reddit API error: ${json.message || json.error}`);
+            }
+            
+            if (!json.data || !json.data.children) {
+                throw new Error('Invalid response from Reddit');
+            }
+            
+            afterToken = json.data.after;
+            const posts = json.data.children;
+
+            if (posts.length === 0 && reset) {
+                feed.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No posts found. Try a different subreddit.</div>';
+            } else {
+                let imagesFound = 0;
+            posts.forEach(post => {
+                const data = post.data;
+                // Simple filter: Must have a URL and act like an image
+                // Note: v.redd.it videos are skipped in this simple version as they require complex audio merging
+                    if (data.post_hint === 'image' || (data.url && data.url.match(/\.(jpeg|jpg|gif|png)$/i))) {
+                    createCard(data);
+                        imagesFound++;
+                    }
+                });
+                
+                // If reset and no images found, show message
+                if (reset && imagesFound === 0) {
+                    feed.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No image posts found in this subreddit. Try r/pics, r/aww, or r/funny.</div>';
+                }
+            }
+
+        } catch (error) {
+            console.error('Full error:', error);
+            if (reset) {
+                let errorMsg = 'Error loading subreddit. ';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('CORS')) {
+                    errorMsg += '<br><br><strong>Network Error:</strong><br>';
+                    errorMsg += '1. Make sure you\'re running through a local server (not file://)<br>';
+                    errorMsg += '2. Check your internet connection<br>';
+                    errorMsg += '3. Check browser console (F12) for detailed errors<br><br>';
+                    errorMsg += '<strong>To start server:</strong><br>';
+                    errorMsg += '<code style="background:#333; padding:5px; border-radius:3px;">./start.sh</code><br>';
+                    errorMsg += 'or<br>';
+                    errorMsg += '<code style="background:#333; padding:5px; border-radius:3px;">python3 -m http.server 8000</code><br><br>';
+                    errorMsg += '<small style="color:#888;">Note: Reddit may be blocking requests. This is a known issue with Reddit\'s API.</small>';
+                } else if (error.message.includes('blocking') || error.message.includes('403') || error.message.includes('429')) {
+                    errorMsg += error.message + '<br><br>';
+                    errorMsg += '<strong>Reddit is blocking requests.</strong> This is a Reddit-side issue, not a problem with this app.<br><br>';
+                    errorMsg += 'Possible solutions:<br>';
+                    errorMsg += '• Wait a few minutes and try again<br>';
+                    errorMsg += '• Reddit may be rate-limiting or blocking automated requests<br>';
+                    errorMsg += '• Check if Reddit is accessible in your browser<br><br>';
+                    errorMsg += '<small style="color:#888;">Check the browser console (F12) for more details.</small>';
+                } else if (error.message.includes('404')) {
+                    errorMsg += 'The subreddit may be private or not exist. ' + error.message;
+                } else {
+                    errorMsg += error.message || 'Unknown error occurred.';
+                    errorMsg += '<br><br><small style="color:#888;">Check the browser console (F12) for more details.</small>';
+                }
+                feed.innerHTML = `<div style="text-align:center; padding:20px; color:#ff6b6b; line-height:1.6;">${errorMsg}</div>`;
+            }
+        }
+
+        isLoading = false;
+        loadingDiv.style.display = 'none';
+    }
+
+    function createCard(data) {
+        const feed = document.getElementById('feed');
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        // Create image element
+        const img = document.createElement('img');
+        img.src = data.url;
+        img.loading = 'lazy';
+        img.alt = 'Content';
+        card.appendChild(img);
+
+        // Create card content
+        const cardContent = document.createElement('div');
+        cardContent.className = 'card-content';
+
+        // Create title (safely escape HTML)
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = data.title;
+        cardContent.appendChild(title);
+
+        // Create actions
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const author = document.createElement('span');
+        author.style.cssText = 'color:#888; font-size:0.8em;';
+        author.textContent = `u/${data.author}`;
+        actions.appendChild(author);
+
+        // Create download button that actually downloads
+        const downloadBtn = document.createElement('a');
+        downloadBtn.href = data.url;
+        downloadBtn.className = 'btn-dl';
+        downloadBtn.textContent = 'Download ⬇';
+        downloadBtn.download = data.url.split('/').pop() || 'reddit-image';
+        downloadBtn.target = '_blank';
+        actions.appendChild(downloadBtn);
+
+        cardContent.appendChild(actions);
+        card.appendChild(cardContent);
+        feed.appendChild(card);
+    }
+
+    // Infinite Scroll Logic (throttled to prevent multiple rapid calls)
+    let scrollTimeout;
+    window.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+            loadFeed();
+        }
+        }, 100);
+    });
+
+    // Load default on start
+    loadFeed(true);
+
+</script>
+
+</body>
+</html>
