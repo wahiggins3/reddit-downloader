@@ -1,0 +1,38 @@
+{
+  "name": "reddit-media-downloader",
+  "version": "2.0.0",
+  "description": "A clean, feature-rich web app to browse and download media from Reddit subreddits with rate limiting for personal use",
+  "main": "index.html",
+  "scripts": {
+    "start": "./start.sh",
+    "serve": "python3 -m http.server 8000"
+  },
+  "keywords": [
+    "reddit",
+    "downloader",
+    "media",
+    "images",
+    "videos",
+    "scraper"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "features": [
+    "Dark theme interface",
+    "Infinite scroll",
+    "Grid and list views",
+    "Video support (v.redd.it, imgur, youtube)",
+    "Multiple filter options (hot, new, top, rising, controversial)",
+    "Time range filtering",
+    "Search within results",
+    "Favorites/bookmarking system",
+    "Keyboard shortcuts",
+    "Rate limiting for API protection",
+    "Image lazy loading with loading states",
+    "Responsive design"
+  ]
+}
