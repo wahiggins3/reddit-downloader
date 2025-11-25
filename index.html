@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Media Downloader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+    <div class="header-controls">
+        <input type="text" id="subredditInput" placeholder="subreddit (e.g. pics)" value="pics">
+
+        <select id="filterSelect">
+            <option value="hot">🔥 Hot</option>
+            <option value="new">🆕 New</option>
+            <option value="top">⭐ Top</option>
+            <option value="rising">📈 Rising</option>
+            <option value="controversial">⚡ Controversial</option>
+        </select>
+
+        <select id="timeRangeSelect" style="display:none;">
+            <option value="hour">Past Hour</option>
+            <option value="day">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="all">All Time</option>
+        </select>
+
+        <button onclick="loadFeed(true)">Go</button>
+
+        <button class="view-toggle" id="viewToggle" onclick="toggleView()" title="Toggle between list and grid view">
+            <span id="viewIcon">⊞</span>
+        </button>
+
+        <button onclick="toggleShortcutsHelp()" title="Keyboard shortcuts (?)">?</button>
+    </div>
+
+    <div class="header-controls" style="width: 100%; max-width: 600px;">
+        <input type="text" id="searchInput" placeholder="🔍 Search within results..." style="width: 100%;">
+    </div>
+</header>
+
+<div id="feed"></div>
+<div id="loading" class="loading" style="display:none;">Loading more...</div>
+
+<button id="backToTop" class="back-to-top" onclick="scrollToTop()" title="Back to top (T)">
+    ↑
+</button>
+
+<script src="app.js"></script>
+
+</body>
+</html>
